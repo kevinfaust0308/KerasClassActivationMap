@@ -4,7 +4,7 @@ import cv2
 from keras.backend import function
 
 
-def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1, overlay=False, overlay_alpha=0.7):
+def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1, overlay=False, overlay_alpha=0.4):
     ''' (keras.Model, str, int, int, bool, float) -> ndarray, ndarray
     Returns the class activation map of the image with the highest predicted class 
     
@@ -108,5 +108,5 @@ def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1,
         # add overlay
         cam = cv2.addWeighted(cam, 1-overlay_alpha, original_img, overlay_alpha, 0)
         
-    # return cam and our softmax class predictions
+    # return cam and our class predictions
     return cam, pred
