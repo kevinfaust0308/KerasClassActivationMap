@@ -4,7 +4,7 @@ import cv2
 from keras.backend import function
 
 
-def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1, overlay=False, overlay_alpha=0.4):
+def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1, overlay=False, overlay_alpha=0.5):
     ''' (keras.Model, str, int, int, bool, float) -> ndarray, ndarray
     Returns the class activation map of the image with the highest predicted class 
     
@@ -17,7 +17,7 @@ def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1,
     
     Ex: if model predicts image to be a dog, this function returns the dog activation map
 
-    Class activation map is a unsupervised way of doing object localization with accuracy near par
+    Class activation map is an unsupervised way of doing object localization with accuracy near par
     with supervised methods
     '''
 
