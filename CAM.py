@@ -5,21 +5,39 @@ from keras.backend import function
 from PIL import Image
 
 
-def get_pred_and_conv_outputs(model, original_img, last_conv_layer_idx):
+##############################################################
+# Main functions (at bottom):
+
+# 1. get_cam
+# 2. get_multi_layered_cam
+# 3. overlay_prediction_on_image
+##############################################################
+
+# colormaps (https://matplotlib.org/examples/color/colormaps_reference.html)
+# for multi layered cam, these are some possible colors
+COLORMAPS = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges', 'Greys', 'jet']
+
+
+def get_pred_and_conv_outputs(model, img, conv_name):
     '''
     Returns the predictions of the image evaluated by the model as well as the feature maps
     from the final convolutional layer
     '''
-
-    # Reshape into 4d tensor
-    img = np.expand_dims(original_img, axis=0)
+    
+    img = np.expand_dims(img, axis=0)
 
     # variables for easy access to needed layers
     input_layer = model.layers[0]
     final_layer = model.layers[-1]
 
-    # last conv layer (depends on model)
-    final_conv_layer = model.layers[last_conv_layer_idx]
+    # get feature maps from this conv layer
+    final_conv_layer = None
+    for l in model.layers:
+        if l.name == conv_name:
+            final_conv_layer = l
+    # if didnt find the layer, raise error
+    if not final_conv_layer:
+        raise Exception('Layer name does not exist within model')
 
     # a function that takes in the input layer and outputs
     # 1. the feature maps after the last convolutional layer 2. prediction of image
@@ -177,7 +195,7 @@ def apply_cam_transparency(cam, overlay_alpha, remove_white_pixels):
     for pixel in cam:
         # if we want to remove whitish pixels, check if current pixel averages to be whitish (values close to 255)
         # then make it a transparent black pixel
-        if remove_white_pixels and np.mean(pixel[:3]) > 0.9 * 255:
+        if remove_white_pixels and np.mean(pixel[:3]) > 0.90 * 255:
             pixel[:4] = 0
         # otherwise, just make the alpha equal to overlay_alpha
         else:
@@ -187,6 +205,12 @@ def apply_cam_transparency(cam, overlay_alpha, remove_white_pixels):
     return cam.reshape((orig_width, orig_height, cam.shape[1]))
 
 
+
+############
+
+# original implementation. colormap will be assigned to order of decreasing class probabilities
+
+############
 def get_image_with_cam(class_indices, class_weights, conv_outputs, colormaps, original_img, overlay_alpha,
                        remove_white_pixels):
     '''
@@ -225,7 +249,7 @@ def get_image_with_cam(class_indices, class_weights, conv_outputs, colormaps, or
     return original_img.reshape(image_width_height + (3,)).astype(np.uint8)
 
 
-def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1, overlay=False, overlay_alpha=0.5,
+def get_cam(model, image, conv_name, class_idx=-1, overlay=False, overlay_alpha=0.5,
                            cmap=None):
     '''   
     Returns the class activation map of a image class, optionally as an overlay over the original image
@@ -237,11 +261,11 @@ def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1,
     model : '~keras.models'
         Model to generate prediction and CAM off of
 
-    image_path : string
-        Relative path to image location
+    image : ndarray
+        Matrix representation 
         
-    last_conv_layer_idx : int
-        Index of the final convolutional layer in the model
+    conv_name : str
+        Name of the convolutional layer which we will generate the CAM
         
     class_idx: int, optional, default: -1
         If -1, defaults to using index of class with highest probability of representing the given image
@@ -265,11 +289,11 @@ def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1,
     if not (0 <= overlay_alpha <= 1):
         raise Exception("Invalid overlay_alpha given")
 
-    # read image (height, width, channel)
-    original_img = plt.imread(image_path) / 255
+    # image
+    original_img = image/255.
 
     # get predictions and final convolutional layer feature maps
-    pred, conv_outputs = get_pred_and_conv_outputs(model, original_img, last_conv_layer_idx)
+    pred, conv_outputs = get_pred_and_conv_outputs(model, original_img, conv_name)
 
     # determine which class we will get a cam for
     class_indices = get_class_indexes(pred, class_idx, None, None)
@@ -296,7 +320,7 @@ def predict_label_with_cam(model, image_path, last_conv_layer_idx, class_idx=-1,
     return cam, pred
 
 
-def get_multi_stacked_cam(model, image_path, classes, last_conv_layer_idx, overlay_alpha=0.3, threshold=0.3,
+def get_multi_layered_cam(model, image, classes, conv_name, overlay_alpha=0.3, threshold=0.3,
                           show_top_x_classes=None, pretty_top_predictions=True):  
     '''   
     Returns the image-to-predict overlayed with class activation maps
@@ -308,14 +332,14 @@ def get_multi_stacked_cam(model, image_path, classes, last_conv_layer_idx, overl
     model : '~keras.models'
         Model to generate prediction and CAM off of
 
-    image_path : string
-        Relative path to image location
+    image : ndarray
+        Matrix representation 
         
     classes: list of strings
         Names of all the classes the model was trained on
         
-    last_conv_layer_idx : int
-        Index of the final convolutional layer in the model 
+    conv_name : str
+        Name of the convolutional layer which we will generate the CAM
         
     overlay_alpha: float, optional, default: 0.3, values: [0,1]
         Transparency of the cam overlay on top of the original image
@@ -353,14 +377,11 @@ def get_multi_stacked_cam(model, image_path, classes, last_conv_layer_idx, overl
         # show all the classes
         show_top_x_classes = len(CLASSES)
 
-    # colormaps (https://matplotlib.org/examples/color/colormaps_reference.html)
-    COLORMAPS = ['Reds', 'Blues', 'Greens', 'Purples', 'Oranges']
-
-    # read image (height, width, channel)
-    original_img = plt.imread(image_path) / 255
+    # image
+    original_img = image/255.
 
     # get predictions and final convolutional layer feature maps
-    pred, conv_outputs = get_pred_and_conv_outputs(model, original_img, last_conv_layer_idx)
+    pred, conv_outputs = get_pred_and_conv_outputs(model, original_img, conv_name)
 
     # determine which classes we will get a cam for
     class_indices = get_class_indexes(pred, None, show_top_x_classes, threshold)
@@ -374,10 +395,76 @@ def get_multi_stacked_cam(model, image_path, classes, last_conv_layer_idx, overl
     # check if we should englishify pred
     if pretty_top_predictions:
         new_pred = {}
+          
         for i, j in enumerate(class_indices):
-            # get label for this class and add as a key and add the prediction score and cmap legend
+             # get label for this class and add as a key and add the prediction score and cmap legend
             new_pred[CLASSES[j]] = [pred[j], COLORMAPS[i]]
         pred = new_pred
 
     # return cam and our class predictions
     return cam, pred
+
+
+
+
+def overlay_prediction_on_image(image, pred, color): 
+    '''
+    Takes a CAM overlayed image and writes predictions over it inplace
+    
+    Parameters
+    -----------
+    image : ndarray
+        Matrix representation 
+        
+    pred : dict of list
+        Has label as key and list of accuracy + additional information in list format
+        
+    color : str
+        RGB tuple
+    
+    Returns
+    --------
+    None
+    '''
+        
+    # change pred to list
+    my_list = []
+    for obj in pred:
+        
+        listy = pred[obj].copy()
+
+        # make pred accuracy 2 decimals
+        p = '{:.2f}'.format(listy.pop(0)*100)
+        
+        # check if we only have accuracy or if we have other info such as color legend
+        if len(listy) > 0:
+            text = '{}: {}% {}'.format(obj, p, listy)
+        else:
+            text = '{}: {}%'.format(obj, p)
+        
+        # our new list will have object name, acc
+        my_list.append(text)
+    
+    
+    # text color
+    text_color = color
+    # starting top offset
+    top_offset = 30
+    
+    # loop through all those pred labels and add to image
+    for label in my_list:
+
+        cv2.putText(
+            image, # put text on this image
+            "{}".format(label), # text
+            (10,top_offset),# left offset, top offset
+            cv2.FONT_HERSHEY_SIMPLEX, # font family
+            0.6, # scale of text size
+            text_color, # color
+            1, # line width
+            cv2.LINE_AA # line type
+        )
+
+        # move next text down for spacing
+        top_offset += 30
+
