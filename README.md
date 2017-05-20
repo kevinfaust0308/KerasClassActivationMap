@@ -2,15 +2,16 @@
 
 Class Activation Map is an unsupervised way of doing object localization with accuracy near par with supervised methods.
 
-CAM is a custom Python implementation of CAM using Keras with a Tensorflow backend. Takes in an image and returns
-1. Prediction accuracy (+label and heatmap legend if multi overlay)
+Custom implementation of CAM using Keras with a Tensorflow backend. Takes in an image and returns
+1. Prediction accuracy (alongside class label and heatmap legend)
 2. Heatmap showing which parts of the image constituted the majority of the classification. There is the option to overlay a single or multiple CAM heatmap(s) on top of the original image.
 
 ## Getting Started
 
 Within CAM.py, please read docstring of:
-1. predict_label_with_cam
-2. get_multi_stacked_cam 
+1. get_cam
+2. get_multi_layered_cam
+3. overlay_prediction_on_image (writes predictions on top of CAM)
 
 Must have a keras model with a global average pooling layer after the final convolution layer followed by a single input -> output layer (Part 1 jupyter notebook)
 
